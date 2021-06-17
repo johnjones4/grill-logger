@@ -1,5 +1,7 @@
 #include <LiquidCrystal.h>
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include "secrets.h"
 
 // the value of the 'other' resistor
 #define SERIESRESISTOR 100000    
@@ -51,18 +53,19 @@ float celsuisToFahrenheit(float celsius) {
   return (celsius * 9 / 5) + 32;
 }
 
-float displayTemperatureLine(int line, float celsuisTemp) {
+float displayTemperatureLine(char *label, int line, float celsuisTemp) {
   float fahrenheit = celsuisToFahrenheit(celsuisTemp);
   char buffer[16];
   memset(buffer, ' ', 16);
-  sprintf(buffer, "%.2f *F", fahrenheit);
+  sprintf(buffer, "%s: %.2f *F", label, fahrenheit);
+  Serial.println(buffer)
   lcd.setCursor(line, 0);
   lcd.print(buffer);
 }
 
 float displayTemperatures(float celsuisTemp1, float celsuisTemp2) {
-  displayTemperatureLine(0, celsuisTemp1);
-  displayTemperatureLine(1, celsuisTemp2);
+  displayTemperatureLine("Meat", 0, celsuisTemp1);
+  displayTemperatureLine("Smoke", 1, celsuisTemp2);
 }
 
 bool connectWifi() {
@@ -86,8 +89,24 @@ bool connectWifi() {
 }
 
 
-float logTemperatures(float celsuisTemp1, float celsuisTemp2) {
-  
+void logTemperatures(float celsuisTemp1, float celsuisTemp2) {
+  if (WiFi.status() != WL_CONNECTED) {
+    if (!connectWifi()) {
+      return;
+    }
+  }
+  int now = millis();
+  HTTPClient http;
+  http.begin(POST_URL);
+  http.addHeader("Content-Type", "application/json");
+  char postData[512];
+  snprintf(postData, sizeof(postData), "{\"uptime\":%d,\"meatTemp\":%f,\"smokeTemp\":%f}", now, celsuisTemp1, celsuisTemp2);
+  int httpResponseCode = http.POST(postData);
+  Serial.println(postData);
+  Serial.println(httpResponseCode);
+  if (httpResponseCode != 200) {
+    Serial.printf("Bad HTTP response code %d\n", httpResponseCode);
+  }
 }
  
 void loop(void) {
@@ -103,5 +122,5 @@ void loop(void) {
 
   int endTime = millis();
   
-  delay(10000 - (endTime - startTime));
+  delay(20000 - (endTime - startTime));
 }
