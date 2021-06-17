@@ -1,3 +1,5 @@
+#include <LiquidCrystal.h>
+
 // thermistor-1.ino Simple test program for a thermistor for Adafruit Learning System
 // https://learn.adafruit.com/thermistor/using-a-thermistor by Limor Fried, Adafruit Industries
 // MIT License - please keep attribution and consider buying parts from Adafruit
@@ -15,8 +17,12 @@
 // The beta coefficient of the thermistor (usually 3000-4000)
 #define BCOEFFICIENT 3950
  
+LiquidCrystal lcd(14, 32, 15, 33, 27, 12);
+
 void setup(void) {
   Serial.begin(115200);
+//  lcd.begin(16, 2);
+//  lcd.print("hello, world!");
 }
  
 void loop(void) {
@@ -44,6 +50,11 @@ void loop(void) {
   Serial.print("Temperature "); 
   Serial.print(steinhart);
   Serial.println(" *C");
+  char buffer[16];
+  memset(buffer, ' ', 16);
+  sprintf(buffer, "%f *C", steinhart);
+  lcd.setCursor(0, 0);
+  lcd.print(buffer);
 
  
   delay(1000);
