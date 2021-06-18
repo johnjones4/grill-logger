@@ -1,4 +1,3 @@
-#include <LiquidCrystal.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include "secrets.h"
@@ -18,21 +17,32 @@
 #define BCOEFFICIENT 3950
 // Samples to take per reading
 #define NUMSAMPLES 10
- 
-LiquidCrystal lcd(14, 32, 15, 33, 27, 12);
+
+#define LED_WORKING 14
+#define LED_READING 32
+#define LED_TRANSMIT 15
+#define LED_ERROR 33
+#define N_LEDS 4
+
+int leds[] = {LED_WORKING, LED_READING, LED_TRANSMIT, LED_ERROR};
 
 void setup(void) {
   Serial.begin(115200);
-//  lcd.begin(16, 2);
+  for (int i = 0; i < N_LEDS; i++) {
+    pinMode(leds[i], OUTPUT);
+  }
+  setStatusLed(LED_WORKING, true);
 }
 
 float takeReading(int pin) {
+  setStatusLed(LED_READING, true);
   int samples[NUMSAMPLES];
   int total;
   for (int i=0; i<NUMSAMPLES; i++) {
     total += analogRead(pin);
     delay(10);
   }
+  setStatusLed(LED_READING, false);
   return ((float)total/(float)NUMSAMPLES);
 }
 
@@ -49,25 +59,6 @@ float calculateTempCelsius(float reading) {
   return steinhart;
 }
 
-float celsuisToFahrenheit(float celsius) {
-  return (celsius * 9 / 5) + 32;
-}
-
-float displayTemperatureLine(char *label, int line, float celsuisTemp) {
-  float fahrenheit = celsuisToFahrenheit(celsuisTemp);
-  char buffer[16];
-  memset(buffer, ' ', 16);
-  sprintf(buffer, "%s: %.2f *F", label, fahrenheit);
-  Serial.println(buffer)
-  lcd.setCursor(line, 0);
-  lcd.print(buffer);
-}
-
-float displayTemperatures(float celsuisTemp1, float celsuisTemp2) {
-  displayTemperatureLine("Meat", 0, celsuisTemp1);
-  displayTemperatureLine("Smoke", 1, celsuisTemp2);
-}
-
 bool connectWifi() {
 //  WiFi.config(STATIC_IP, STATIC_GATEWAY, STATIC_SUBNET, STATIC_DNS); 
   
@@ -79,6 +70,7 @@ bool connectWifi() {
     Serial.println("Establishing connection to WiFi..");
     if (millis() - start > 60000) {
       Serial.println("WiFi timeout ...");
+      setStatusLed(LED_ERROR, true);
       return false;
     }
   }
@@ -90,6 +82,7 @@ bool connectWifi() {
 
 
 void logTemperatures(float celsuisTemp1, float celsuisTemp2) {
+  setStatusLed(LED_TRANSMIT, true);
   if (WiFi.status() != WL_CONNECTED) {
     if (!connectWifi()) {
       return;
@@ -106,6 +99,18 @@ void logTemperatures(float celsuisTemp1, float celsuisTemp2) {
   Serial.println(httpResponseCode);
   if (httpResponseCode != 200) {
     Serial.printf("Bad HTTP response code %d\n", httpResponseCode);
+    setStatusLed(LED_ERROR, true);
+    return;
+  }
+  setStatusLed(LED_TRANSMIT, false);
+  setStatusLed(LED_ERROR, false);
+}
+
+void setStatusLed(int led, bool ledOn) {
+  if (ledOn) {
+    digitalWrite(led, HIGH);
+  } else {
+    digitalWrite(led, LOW);
   }
 }
  
@@ -117,7 +122,6 @@ void loop(void) {
   float temp1 = calculateTempCelsius(reading1);
   float temp2 = calculateTempCelsius(reading2);
 
-  displayTemperatures(temp1, temp2);
   logTemperatures(temp1, temp2);
 
   int endTime = millis();
